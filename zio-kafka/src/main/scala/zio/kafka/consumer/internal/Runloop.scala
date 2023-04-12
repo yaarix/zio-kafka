@@ -473,7 +473,8 @@ private[consumer] final class Runloop private (
       .fromQueue(commandQueue)
       .timeoutFail[Throwable](RunloopTimeout)(runloopTimeout)
       .takeWhile(_ != StopRunloop)
-      .runFoldChunksDiscardZIO(State.initial) { (state, commands) =>
+      .aggregateAsync(ZSink.collectAllN[Command](commandQueueSize))
+      .runFoldZIO(State.initial) { (state, commands) =>
         for {
           _            <- ZIO.logTrace(s"Processing ${commands.size} commands: ${commands.mkString(",")}")
           updatedState <- ZIO.foldLeft(commands)(state)(handleCommand)
