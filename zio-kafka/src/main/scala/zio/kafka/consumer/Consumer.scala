@@ -11,6 +11,7 @@ import zio.kafka.utils.SslHelper
 import zio.stream._
 
 import scala.jdk.CollectionConverters._
+import scala.util.control.NoStackTrace
 
 trait Consumer {
 
@@ -154,6 +155,7 @@ trait Consumer {
 }
 
 object Consumer {
+  case object RunloopTimeout extends RuntimeException("Timeout in Runloop") with NoStackTrace
 
   private final class Live private[Consumer] (
     consumer: ConsumerAccess,
