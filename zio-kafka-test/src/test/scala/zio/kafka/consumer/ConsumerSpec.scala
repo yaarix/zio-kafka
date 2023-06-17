@@ -1151,8 +1151,8 @@ object ConsumerSpec extends ZIOSpecDefaultSlf4j with KafkaRandom {
                 clientId <- randomClient
                 topic    <- randomTopic
                 settings <- consumerSettings(clientId = clientId)
+                producer <- scheduledProducer(topic, kvs, Schedule.fixed(100.millis)).fork
                 consumer <- Consumer.make(settings, diagnostics = diagnostics)
-                _        <- produceMany(topic, kvs)
                 ref = new AtomicInteger(0)
                 // Starting a consumption session to start the Runloop.
                 fiber <-
@@ -1162,8 +1162,11 @@ object ConsumerSpec extends ZIOSpecDefaultSlf4j with KafkaRandom {
                     .take(numberOfMessages.toLong)
                     .runCount
                     .fork
+                // TODO: replace sleep with a promise to check that stream is running
+                _          <- ZIO.sleep(1.second)
                 _          <- consumer.stopConsumption
                 consumed_0 <- fiber.join
+                _          <- producer.interrupt
               } yield assert(consumed_0)(isLessThan(numberOfMessages.toLong))
 
             for {
@@ -1183,7 +1186,7 @@ object ConsumerSpec extends ZIOSpecDefaultSlf4j with KafkaRandom {
                 )
               )
             )
-          } @@ nonFlaky(5),
+          } @@ timeout(30.seconds),
           test(
             "it's possible to start a new consumption session from a Consumer that had a consumption session stopped previously"
           ) {
@@ -1243,5 +1246,18 @@ object ConsumerSpec extends ZIOSpecDefaultSlf4j with KafkaRandom {
       .provideSomeShared[Scope](
         Kafka.embedded
       ) @@ withLiveClock @@ sequential @@ timeout(2.minutes)
+
+  private def scheduledProducer[R](
+    topic: String,
+    messages: Iterable[(String, String)],
+    schedule: Schedule[R, Any, Long]
+  ): ZIO[Producer with R, Throwable, Unit] =
+    ZStream
+      .fromSchedule(schedule)
+      .zip(ZStream.fromIterable(messages))
+      .mapZIO { case (_, (key, message)) =>
+        produceOne(topic, key, message)
+      }
+      .runDrain
 
 }
