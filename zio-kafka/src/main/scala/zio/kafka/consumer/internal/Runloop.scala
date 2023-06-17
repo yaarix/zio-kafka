@@ -608,7 +608,8 @@ private[consumer] object Runloop {
       waitForRunloopStop = fiber.join.orDie
 
       _ <- ZIO.addFinalizer(
-             runloop.shutdown *>
+             ZIO.logDebug("Shutting down Runloop") *>
+               runloop.shutdown *>
                waitForRunloopStop <*
                ZIO.logDebug("Shut down Runloop")
            )
