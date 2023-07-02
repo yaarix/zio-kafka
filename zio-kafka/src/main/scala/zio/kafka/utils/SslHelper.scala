@@ -119,6 +119,10 @@ object SslHelper {
         result <-
           ZIO.acquireReleaseInterruptible(
             ZIO.attemptBlockingInterrupt {
+              // Note about this algorithm:
+              // We make all the networking exchanges (ie. `openSocket`, `sendTestRequest` and `readAnswerFromTestRequest`) in this
+              // interruptible blocking section so that we can easily timeout/interrupt the whole process if it takes too long.
+
               val channel = openSocket(address)
               // Send a simple request to check if the cluster accepts the connection
               sendTestRequest(channel)
